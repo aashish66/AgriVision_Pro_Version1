@@ -62,74 +62,36 @@ st.set_page_config(
 import os
 from pathlib import Path
 
-# No longer using OAuth - credentials file upload only
-
 def initialize_with_refresh_token(cred_data, project_id=None):
-    """Initialize GEE using refresh token or service account credentials from uploaded file"""
+    """Initialize GEE using refresh token credentials from uploaded file"""
     try:
-        # Detect credential type
-        is_service_account = 'type' in cred_data and cred_data['type'] == 'service_account'
-        has_refresh_token = 'refresh_token' in cred_data
+        import google.oauth2.credentials
         
-        # Try service account first
-        if is_service_account or ('private_key' in cred_data and 'service_account_email' in cred_data):
-            try:
-                import google.auth.service_account
-                credentials = google.auth.service_account.Credentials.from_service_account_info(
-                    cred_data,
-                    scopes=['https://www.googleapis.com/auth/earthengine']
-                )
-                
-                proj_id = project_id or cred_data.get('project_id')
-                if proj_id:
-                    ee.Initialize(credentials, project=proj_id, opt_url='https://earthengine-highvolume.googleapis.com')
-                else:
-                    ee.Initialize(credentials, opt_url='https://earthengine-highvolume.googleapis.com')
-                return True, None
-            except Exception as sa_err:
-                if has_refresh_token:
-                    pass  # Fall through to OAuth attempt
-                else:
-                    return False, f"Service account error: {str(sa_err)[:80]}"
+        # Get credentials from the uploaded file - do not use hardcoded defaults
+        client_id = cred_data.get('client_id')
+        client_secret = cred_data.get('client_secret')
         
-        # Try OAuth/refresh token
-        if has_refresh_token:
-            try:
-                import google.oauth2.credentials
-                
-                refresh_token = cred_data.get('refresh_token')
-                
-                if not refresh_token:
-                    return False, "Refresh token missing. Run: earthengine authenticate"
-                
-                # Google's official Earth Engine OAuth app credentials
-                # These are the public client credentials used by earthengine CLI
-                credentials = google.oauth2.credentials.Credentials(
-                    token=None,
-                    refresh_token=refresh_token,
-                    token_uri='https://oauth2.googleapis.com/token',
-                    client_id='517222506229-vsmmajv5gipbgpkq0jvlg5830gon1p60.apps.googleusercontent.com',
-                    client_secret='d-FL95Q19q7MQmFJt7KUw2N7',
-                    scopes=['https://www.googleapis.com/auth/earthengine']
-                )
-                
-                if project_id:
-                    ee.Initialize(credentials, project=project_id, opt_url='https://earthengine-highvolume.googleapis.com')
-                else:
-                    ee.Initialize(credentials, opt_url='https://earthengine-highvolume.googleapis.com')
-                return True, None
-            except Exception as oauth_err:
-                error_str = str(oauth_err)
-                if 'invalid_client' in error_str:
-                    return False, "Invalid client error. Your credentials may be expired. Run: earthengine authenticate"
-                else:
-                    return False, f"Authentication error: {error_str[:80]}"
+        if not client_id or not client_secret:
+            return False, "Credentials file missing client_id or client_secret"
         
-        # No recognized credential type
-        return False, "Unrecognized credential format. Need refresh_token or service account."
-    
+        credentials = google.oauth2.credentials.Credentials(
+            token=None,
+            refresh_token=cred_data.get('refresh_token'),
+            token_uri='https://oauth2.googleapis.com/token',
+            client_id=client_id,
+            client_secret=client_secret,
+            scopes=cred_data.get('scopes', ['https://www.googleapis.com/auth/earthengine'])
+        )
+        try:
+            if project_id:
+                ee.Initialize(credentials, project=project_id, opt_url='https://earthengine-highvolume.googleapis.com')
+            else:
+                ee.Initialize(credentials, opt_url='https://earthengine-highvolume.googleapis.com')
+            return True, None
+        except Exception as init_err:
+            return False, str(init_err)
     except Exception as e:
-        return False, f"Error: {str(e)[:80]}"
+        return False, str(e)
 
 def try_auto_initialize():
     """
@@ -541,120 +503,70 @@ else:
         st.sidebar.caption("⚠️ Project ID required")
     
     st.sidebar.markdown("---")
-    st.sidebar.markdown("**🔑 Authentication Options**")
+    st.sidebar.markdown("**🔑 Choose Authentication Method:**")
     
-    # Tab-like selection between two methods
-    auth_method = st.sidebar.radio(
-        "Choose authentication method:",
-        ["📝 Paste Refresh Token", "📁 Upload Credentials File"],
-        key="auth_method_select"
+    # Option 1: Upload credentials file
+    st.sidebar.markdown("**Option 1:** Upload your credentials file")
+    st.sidebar.caption("File location: `~/.config/earthengine/credentials`")
+    uploaded_file = st.sidebar.file_uploader(
+        "📁 Upload credentials file",
+        type=None,  # Accept any file type (credentials file has no extension)
+        help="The file is named 'credentials' (no extension) and contains JSON",
+        label_visibility="collapsed"
     )
     
-    st.sidebar.markdown("---")
-    
-    if auth_method == "📝 Paste Refresh Token":
-        st.sidebar.caption("Easiest option - paste your refresh token")
-        
-        refresh_token = st.sidebar.text_area(
-            "Paste your refresh token:",
-            placeholder="1//0...",
-            height=100,
-            help="Get this by running: earthengine authenticate --auth_mode=notebook",
-            label_visibility="collapsed"
-        )
-        
-        if refresh_token.strip():
-            st.sidebar.success(f"✅ Token pasted ({len(refresh_token)} chars)")
+    if uploaded_file is not None:
+        try:
+            cred_data = json.load(uploaded_file)
+            st.session_state.uploaded_credentials = cred_data
+            st.sidebar.success("✅ File loaded!")
             
-            # Create credentials object from refresh token
-            if st.sidebar.button("🔗 Connect to Google Earth Engine", type="primary", use_container_width=True, disabled=not project_id):
-                with st.spinner("🔄 Connecting..."):
-                    cred_data = {
-                        "refresh_token": refresh_token.strip(),
-                        "token_uri": "https://oauth2.googleapis.com/token",
-                        "client_id": "517222506229-vsmmajv5gipbgpkq0jvlg5830gon1p60.apps.googleusercontent.com",
-                        "client_secret": "d-FL95Q19q7MQmFJt7KUw2N7"
-                    }
-                    st.session_state.uploaded_credentials = cred_data
+            if st.sidebar.button("🔗 Connect with Uploaded Credentials", type="primary", use_container_width=True, disabled=not project_id):
+                with st.spinner("Connecting..."):
                     success, error = initialize_with_refresh_token(cred_data, project_id)
                     if success:
                         st.session_state.gee_authenticated = True
-                        st.session_state.gee_auth_method = "refresh_token"
-                        st.sidebar.success("✅ Successfully authenticated!")
-                        st.balloons()
+                        st.session_state.gee_auth_method = "uploaded_credentials"
                         st.rerun()
                     else:
-                        st.sidebar.error("❌ Connection failed")
-                        st.sidebar.error(f"Error: {error}")
+                        st.session_state.gee_error = error
+                        st.sidebar.error(f"Failed: {error[:80] if error else 'Unknown error'}")
+        except Exception as e:
+            st.sidebar.error(f"Invalid file: {str(e)[:50]}")
     
-    else:  # Upload Credentials File
-        st.sidebar.caption("Upload your credentials file")
-        
-        # File uploader
-        uploaded_file = st.sidebar.file_uploader(
-            "📁 Select credentials file",
-            type=None,
-            help="Upload your credentials file from ~/.config/earthengine/credentials",
-            label_visibility="collapsed"
-        )
-        
-        if uploaded_file is not None:
-            try:
-                cred_data = json.load(uploaded_file)
-                st.session_state.uploaded_credentials = cred_data
-                
-                if 'refresh_token' in cred_data:
-                    st.sidebar.info("✅ Refresh token found!")
-                st.sidebar.success("✅ File loaded!")
-                
-                # Connect button
-                if st.sidebar.button("🔗 Connect to Google Earth Engine", type="primary", use_container_width=True, disabled=not project_id):
-                    with st.spinner("🔄 Connecting..."):
-                        success, error = initialize_with_refresh_token(cred_data, project_id)
-                        if success:
-                            st.session_state.gee_authenticated = True
-                            st.session_state.gee_auth_method = "credentials_file"
-                            st.sidebar.success("✅ Successfully authenticated!")
-                            st.balloons()
-                            st.rerun()
-                        else:
-                            st.sidebar.error("❌ Connection failed")
-                            st.sidebar.error(f"Error: {error}")
-            except json.JSONDecodeError:
-                st.sidebar.error("❌ Invalid JSON file")
-            except Exception as e:
-                st.sidebar.error(f"❌ Error: {str(e)[:80]}")
+    st.sidebar.markdown("")
+    st.sidebar.markdown("**Option 2:** Sign in with Google")
+    
+    # Option 2: OAuth via browser
+    if st.sidebar.button("🌐 Sign in with Google", use_container_width=True, disabled=not project_id):
+        with st.sidebar:
+            with st.spinner("Opening browser..."):
+                try:
+                    ee.Authenticate(auth_mode='notebook')
+                    ee.Initialize(project=project_id)
+                    st.session_state.gee_authenticated = True
+                    st.session_state.gee_auth_method = "oauth"
+                    st.rerun()
+                except Exception as e:
+                    st.session_state.gee_error = str(e)
+                    st.error(f"Failed: {str(e)[:80]}")
+    
+    st.sidebar.caption("Opens Google sign-in in your browser")
     
     st.sidebar.markdown("---")
     
     # Help section
-    with st.sidebar.expander("❓ Credentials Help"):
+    with st.sidebar.expander("❓ How to get credentials"):
         st.markdown("""
-        ### 🔐 How to Get Credentials
+        **Get your credentials file:**
+        1. Run in terminal: `earthengine authenticate`
+        2. Complete Google sign-in
+        3. Find file at: `~/.config/earthengine/credentials`
+        4. Upload it above
         
-        **Step 1: Run authentication**
-        ```bash
-        earthengine authenticate
-        ```
-        
-        **Step 2: Authorize in browser**
-        - Your Google account page opens
-        - Click "Authorize"
-        
-        **Step 3: File is saved**
-        - Location: `~/.config/earthengine/credentials`
-        
-        **Step 4: Upload in app**
-        - Click "📁 Select credentials file"
-        - Choose the file from step 3
-        
-        **Step 5: Enter Project ID**
-        - Get from: https://code.earthengine.google.com
-        - Format: `ee-yourname`
-        
-        **Step 6: Click Connect**
-        - App connects to Google Earth Engine
-        - Ready to analyze!
+        **Get GEE Project ID:**
+        1. Go to [code.earthengine.google.com](https://code.earthengine.google.com)
+        2. Your project ID is in the URL or settings
         """)
     
     # Show error if any
