@@ -1573,23 +1573,26 @@ if page == "🛰️ Satellite Analysis":
                     'palette': ['#d73027', '#fc8d59', '#fee08b', '#d9ef8b', '#91cf60', '#1a9850']
                 }
                 
-                # Create result map
-                result_map = geemap.Map(center=st.session_state.aoi_center, zoom=12)
+                # Create result map (using pattern compatible with Streamlit Cloud)
+                try:
+                    result_map = geemap.Map()
+                except Exception as e:
+                    st.error(f"Error creating map: {str(e)}")
+                    st.stop()
+                
+                # Center on AOI
+                try:
+                    center = st.session_state.aoi_center
+                    result_map.setCenter(center[1], center[0], 12)
+                except:
+                    result_map.centerObject(confirmed_aoi)
                 
                 # Add index layer FIRST (so it's at the bottom)
                 result_map.addLayer(index_image, vis_params, f'{selected_index}{title_suffix}')
                 
-                # Create outline-only AOI boundary (no fill)
-                # Use ee.Image.paint to create a boundary line
-                empty = ee.Image().byte()
-                aoi_outline = empty.paint(
-                    featureCollection=ee.FeatureCollection([ee.Feature(confirmed_aoi)]),
-                    color=1,
-                    width=3
-                )
-                result_map.addLayer(aoi_outline, {'palette': ['blue']}, 'AOI Boundary')
+                # Add AOI boundary as outline
+                result_map.addLayer(confirmed_aoi, {'color': 'blue'}, 'AOI Boundary', True, 0.5)
                 
-                result_map.centerObject(confirmed_aoi)
                 result_map.to_streamlit(height=500)
                 
                 st.success(f"✅ {selected_index} map generated successfully! (Resolution: {scale}m)")
