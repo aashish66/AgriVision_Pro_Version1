@@ -1,36 +1,43 @@
 # =============================================================================
-# Sen2Greenery - Dependencies
+# AgriVision Pro - Dependencies
 # =============================================================================
-# Install these packages before running the app:
-# pip install -r requirements.txt
+# Pinned versions for Streamlit Cloud compatibility
 # =============================================================================
 
-# Core Streamlit framework (latest for best performance)
-streamlit>=1.32.0
+# Core Streamlit framework
+streamlit==1.32.0
 
 # Google Earth Engine integration
-geemap>=0.30.0
-earthengine-api>=0.1.380
+geemap==0.32.0
+earthengine-api==0.1.390
 
-# Map visualization
-folium>=0.15.0
-streamlit-folium>=0.15.0
-geopandas>=0.14.0
+# Map visualization (critical for AOI display)
+folium==0.15.1
+streamlit-folium==0.17.4
+leafmap==0.30.0
+
+# Geospatial data handling
+geopandas==0.14.3
+shapely==2.0.2
+pyproj==3.6.1
+fiona==1.9.5
 
 # Data processing
-numpy>=1.24.0
-pandas>=2.0.0
+numpy==1.26.4
+pandas==2.1.4
 
 # Image processing
-Pillow>=10.0.0
-matplotlib>=3.7.0
+Pillow==10.2.0
+matplotlib==3.8.2
 
-# HTTP requests for OAuth token exchange
-requests>=2.28.0
+# HTTP requests
+requests==2.31.0
 
-# Optional: for GeoTIFF support
-rasterio>=1.3.0
+# Widget support (required for geemap on Streamlit Cloud)
+ipywidgets==8.1.1
+ipyleaflet==0.18.2
 
 # Performance optimization
-cachetools>=5.3.0
+cachetools==5.3.2
 
+# Note: rasterio removed as it can cause build issues on Streamlit Cloud
