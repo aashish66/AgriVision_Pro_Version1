@@ -1,28 +1,22 @@
-# =============================================================================
-# AgriVision Pro - Streamlit Cloud Dependencies
-# =============================================================================
-# Matched to working GeoClimate-Fetcher reference app
-
-# Core GEE and mapping (same as reference app)
 earthengine-api>=0.1.380
 geemap>=0.34.0
 ipyleaflet>=0.18.0
 ipywidgets>=8.1.0
-
-# Data processing
 pandas
-numpy
+xarray
+netCDF4
+scipy
+rapidfuzz
+tqdm
+rich
 geopandas
-
-# Streamlit
-streamlit
-streamlit-folium
-folium
-
-# Image processing
-Pillow
-matplotlib
-
-# HTTP and caching
-requests
-cachetools
+rasterio
+rio-cogeo
+streamlit>=1.25.0
+folium>=0.14.0
+streamlit-folium>=0.15.0
+plotly>=5.14.0
+extra-streamlit-components>=0.1.60
+meteostat>=1.6.5
+scikit-learn>=1.3.0
+pymannkendall>=1.4.3
