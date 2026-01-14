@@ -1631,19 +1631,26 @@ if page == "🛰️ Satellite Analysis":
                     'palette': ['d73027', 'fc8d59', 'fee08b', 'd9ef8b', '91cf60', '1a9850']
                 }
                 
-                # Create result map using folium with GEE tiles (more reliable on Cloud)
-                center = st.session_state.get('aoi_center', [39.0, -98.0])
-                result_map = create_ee_folium_map(
-                    center=center,
-                    zoom=12,
-                    ee_image=index_image,
-                    vis_params=vis_params,
-                    layer_name=f'{selected_index}{title_suffix}',
-                    aoi=confirmed_aoi
-                )
+                # Create map using geemap (same pattern as working reference app)
+                try:
+                    Map = geemap.Map()
+                except Exception as e:
+                    st.error(f"Error creating map: {str(e)}")
+                    st.stop()
                 
-                # Display the map using st_folium
-                st_folium(result_map, height=500, width=None, returned_objects=[])
+                # Center on geometry
+                try:
+                    centroid = confirmed_aoi.centroid().getInfo()['coordinates']
+                    Map.setCenter(centroid[0], centroid[1], 12)
+                except:
+                    Map.setCenter(0, 0, 4)
+                
+                # Add layers (same as reference app pattern)
+                Map.addLayer(confirmed_aoi, {'color': 'blue'}, 'Study Area', True, 0.5)
+                Map.addLayer(index_image, vis_params, f'{selected_index}{title_suffix}', True)
+                
+                # Display the map
+                Map.to_streamlit(height=500)
                 
                 st.success(f"✅ {selected_index} map generated successfully! (Resolution: {scale}m)")
                 
