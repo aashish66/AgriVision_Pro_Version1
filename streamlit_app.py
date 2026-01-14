@@ -1417,7 +1417,8 @@ if page == "🛰️ Satellite Analysis":
             st.session_state.confirmed_aoi = aoi
             st.session_state.aoi_center = map_center
             st.session_state.aoi_buffer_km = current_buffer
-            st.session_state.aoi_scale = get_scale_for_area(current_buffer)
+            # Pass aoi and buffer_km correctly to avoid crash
+            st.session_state.aoi_scale = get_scale_for_area(aoi=aoi, buffer_km=current_buffer)
             st.success(f"✅ Area of Interest confirmed! (Scale: {st.session_state.aoi_scale}m)")
     
     # Show AOI preview map
