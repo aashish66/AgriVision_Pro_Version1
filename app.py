@@ -370,6 +370,47 @@ def get_area_sqkm(aoi):
         return None
 
 
+def create_ee_folium_map(center, zoom, ee_image, vis_params, layer_name, aoi=None):
+    """
+    Create a folium map with GEE layer using direct tile URL.
+    More reliable on Streamlit Cloud than geemap.
+    """
+    m = folium.Map(location=center, zoom_start=zoom, tiles='OpenStreetMap')
+    
+    try:
+        map_id_dict = ee_image.getMapId(vis_params)
+        tiles_url = map_id_dict['tile_fetcher'].url_format
+        
+        folium.TileLayer(
+            tiles=tiles_url,
+            attr='Google Earth Engine',
+            name=layer_name,
+            overlay=True,
+            control=True
+        ).add_to(m)
+    except Exception as e:
+        st.warning(f"Could not load GEE layer: {str(e)}")
+    
+    if aoi is not None:
+        try:
+            aoi_geojson = aoi.getInfo()
+            folium.GeoJson(
+                aoi_geojson,
+                name='AOI Boundary',
+                style_function=lambda x: {
+                    'fillColor': 'transparent',
+                    'color': 'blue',
+                    'weight': 3,
+                    'fillOpacity': 0
+                }
+            ).add_to(m)
+        except:
+            pass
+    
+    folium.LayerControl().add_to(m)
+    return m
+
+
 @st.cache_data(ttl=3600, show_spinner="Searching for images...")
 def get_image_list(sensor, start_date, end_date, _aoi, max_cloud=100):
     """Get list of available images with metadata (limited to 100 for performance)"""
@@ -1018,30 +1059,22 @@ if page == "🛰️ Satellite Analysis":
                     'bands': [band_name],
                     'min': vmin, 
                     'max': vmax,
-                    'palette': ['#d73027', '#fc8d59', '#fee08b', '#d9ef8b', '#91cf60', '#1a9850']
+                    'palette': ['d73027', 'fc8d59', 'fee08b', 'd9ef8b', '91cf60', '1a9850']
                 }
                 
-                # Create result map (using pattern compatible with Streamlit Cloud)
-                try:
-                    result_map = geemap.Map()
-                except Exception as e:
-                    st.error(f"Error creating map: {str(e)}")
-                    st.stop()
+                # Create result map using folium with GEE tiles (more reliable on Cloud)
+                center = st.session_state.get('aoi_center', [39.0, -98.0])
+                result_map = create_ee_folium_map(
+                    center=center,
+                    zoom=12,
+                    ee_image=index_image,
+                    vis_params=vis_params,
+                    layer_name=f'{selected_index}{title_suffix}',
+                    aoi=confirmed_aoi
+                )
                 
-                # Center on AOI
-                try:
-                    center = st.session_state.aoi_center
-                    result_map.setCenter(center[1], center[0], 12)
-                except:
-                    result_map.centerObject(confirmed_aoi)
-                
-                # Add index layer FIRST
-                result_map.addLayer(index_image, vis_params, f'{selected_index}{title_suffix}')
-                
-                # Add AOI boundary as outline
-                result_map.addLayer(confirmed_aoi, {'color': 'blue'}, 'AOI Boundary', True, 0.5)
-                
-                result_map.to_streamlit(height=500)
+                # Display the map using st_folium
+                st_folium(result_map, height=500, width=None, returned_objects=[])
                 
                 st.success(f"✅ {selected_index} map generated successfully! (Resolution: {scale}m)")
                 
