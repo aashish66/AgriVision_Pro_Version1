@@ -1770,84 +1770,83 @@ if page == "🛰️ Satellite Analysis":
                         image = collection.median().clip(confirmed_aoi)
                         title_suffix = " (Median Composite)"
                 
-                # Calculate index
+                # Calculate vegetation index (exactly like V2)
                 index_image = calculate_index_for_image(image, selected_index, sensor)
                 
-                # Get the band name from the index image
-                band_name = index_image.bandNames().getInfo()[0]
+                # Get scale for sensor (V2 pattern: use native sensor resolution)
+                sensor_scale_map = {
+                    "Sentinel-2": 10,
+                    "Landsat 8/9": 30,
+                    "Landsat 5/7": 30,
+                    "MODIS": 250
+                }
+                scale = sensor_scale_map.get(sensor, 30)
                 
-                # Calculate adaptive scale for stats based on AOI size (like ref app)
-                try:
-                    area_km2 = st.session_state.get('aoi_area_sqkm', 500)  # Use stored area
-                    if area_km2 > 50000:  # Very large
-                        stats_scale = 5000  # 5km for stats
-                    elif area_km2 > 10000:  # Large
-                        stats_scale = 2000  # 2km for stats
-                    elif area_km2 > 1000:  # Medium
-                        stats_scale = 500   # 500m for stats
-                    else:  # Small
-                        stats_scale = 100   # 100m for stats
-                except:
-                    stats_scale = 500  # Default
-                
-                # Get dynamic min/max using percentiles with adaptive scale
+                # Calculate statistics for visualization range (exactly like V2)
                 stats = index_image.reduceRegion(
                     reducer=ee.Reducer.percentile([5, 95]),
                     geometry=confirmed_aoi,
-                    scale=stats_scale,  # Use adaptive scale for stats (not visualization scale)
-                    maxPixels=1e9,
-                    bestEffort=True  # Allow GEE to adjust if needed
+                    scale=scale,
+                    maxPixels=1e9
                 ).getInfo()
                 
-                # Check if stats are empty (indicates no data coverage)
-                vmin_raw = stats.get(f'{band_name}_p5') or stats.get(f'{selected_index}_p5')
-                vmax_raw = stats.get(f'{band_name}_p95') or stats.get(f'{selected_index}_p95')
+                # Get band name (exactly like V2)
+                band_name = index_image.bandNames().getInfo()[0]
+                
+                # Get vis params (exactly like V2)
+                vmin_raw = stats.get(f'{band_name}_p5')
+                vmax_raw = stats.get(f'{band_name}_p95')
+                
+                # Default vis params for each index (V2 pattern)
+                veg_palette = ['d73027', 'fc8d59', 'fee08b', 'd9ef8b', '91cf60', '1a9850']
+                index_defaults = {
+                    'NDVI': (-0.2, 0.8, veg_palette),
+                    'EVI': (-0.2, 0.8, veg_palette),
+                    'SAVI': (-0.2, 0.8, veg_palette),
+                    'GNDVI': (-0.2, 0.8, veg_palette),
+                }
+                default_vmin, default_vmax, palette = index_defaults.get(selected_index, (-0.2, 0.8, veg_palette))
                 
                 if vmin_raw is None or vmax_raw is None:
-                    # Simple warning like V2 - don't block the map
-                    st.warning("⚠️ No data found for statistics. Using default visualization range. Try a composite or different dates.")
-                    vmin = -0.2
-                    vmax = 0.8
+                    st.warning("⚠️ No data found for this area. Try using a composite or different dates.")
+                    vmin, vmax = default_vmin, default_vmax
                 else:
                     vmin = vmin_raw
                     vmax = vmax_raw
                 
-                # Visualization with explicit bands parameter (required for proper rendering)
                 vis_params = {
                     'bands': [band_name],
-                    'min': vmin, 
+                    'min': vmin,
                     'max': vmax,
-                    'palette': ['d73027', 'fc8d59', 'fee08b', 'd9ef8b', '91cf60', '1a9850']
+                    'palette': palette
                 }
                 
-                # Get map center from AOI
+                # Get center (exactly like V2)
                 try:
                     centroid = confirmed_aoi.centroid().getInfo()['coordinates']
-                    map_center = [centroid[1], centroid[0]]  # [lat, lon]
+                    center = [centroid[1], centroid[0]]
                 except:
-                    map_center = [39.0, -98.0]
+                    center = [39.0, -98.0]
                 
-                # Display the map using smart rendering (auto-detects Streamlit Cloud)
+                # Display map (exactly like V2)
                 display_ee_map(
-                    center=map_center,
+                    center=center,
                     zoom=12,
                     ee_image=index_image,
                     vis_params=vis_params,
-                    layer_name=f'{selected_index}{title_suffix}',
+                    layer_name=f"{selected_index}{title_suffix}",
                     aoi=confirmed_aoi,
                     height=500
                 )
                 
-                st.success(f"✅ {selected_index} map generated successfully! (Resolution: {user_resolution}m)")
+                st.success(f"✅ {selected_index} map generated! (Resolution: {scale}m)")
                 
-                # Legend with actual values
-                st.markdown(f"""
-                **Legend:** 🔴 Low ({vmin:.2f}) → 🟡 Moderate → 🟢 High ({vmax:.2f})
-                """)
+                # Legend (exactly like V2)
+                st.markdown(f"**Legend:** 🔴 Low ({vmin:.2f}) → 🟡 Moderate → 🟢 High ({vmax:.2f})")
 
                 
             except Exception as e:
-                st.error(f"Error: {str(e)}")
+                st.error(f"❌ Error: {str(e)}")
     
     # -------------------------------------------------------------------------
     # SECTION 5: Time Series Analysis (V2 Style with Plotly)
