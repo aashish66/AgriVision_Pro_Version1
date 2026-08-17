@@ -687,13 +687,12 @@ def calculate_multispectral_index(img_array, index_name, band_mapping):
 def create_colormap_image(data, colormap='RdYlGn'):
     """Apply colormap to data array."""
     import numpy as np
-    import matplotlib.pyplot as plt
-    import matplotlib.cm as cm
-    
+    import matplotlib
+
     vmin, vmax = np.nanpercentile(data[~np.isnan(data)], [2, 98])
     normalized = np.clip((data - vmin) / (vmax - vmin + 1e-7), 0, 1)
-    
-    cmap = cm.get_cmap(colormap)
+
+    cmap = matplotlib.colormaps[colormap]
     colored = cmap(normalized)
     
     return (colored[:, :, :3] * 255).astype(np.uint8)

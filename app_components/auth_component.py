@@ -11,7 +11,7 @@ import streamlit as st
 import ee
 
 
-@st.cache_resource(show_spinner=False)
+@st.cache_resource(show_spinner=False, ttl=300)
 def _initialize_earth_engine() -> bool:
     """Initialize Earth Engine once per app process. Returns True if ready."""
     try:
