@@ -8,7 +8,7 @@
 
 > Analyze crop health, monitor vegetation dynamics, and track agricultural changes using satellite imagery from multiple sensors.
 
-🚀 **[Launch App](https://agrivision-pro.streamlit.app/)** | 📖 **[GEE Setup Guide](GEE_SETUP.md)**
+🚀 **[Launch App](https://agrivision-pro.streamlit.app/)** — no login or setup needed, just open and go.
 
 ---
 
@@ -44,13 +44,9 @@
 
 ### Use the Live App (Recommended)
 
-1. **Open**: [https://agrivision-pro.streamlit.app/](https://agrivision-pro.streamlit.app/)
-
-2. **Setup GEE** (first time only): Follow the **[GEE Setup Guide](GEE_SETUP.md)**
-
-3. **Upload credentials** and enter your Project ID
-
-4. **Start analyzing!**
+Just **[open the app](https://agrivision-pro.streamlit.app/)** and start
+analyzing — no account, login, or credential upload required. Satellite
+access is pre-configured on the backend.
 
 ### Run Locally
 
@@ -62,26 +58,17 @@ cd AgriVision_Pro_Version1
 # Install dependencies
 pip install -r requirements.txt
 
-# Authenticate with GEE (first time only)
-earthengine authenticate
-
 # Run the app
 streamlit run streamlit_app.py
 ```
 
----
+Locally, the app connects to Earth Engine using whichever credentials it
+finds first: a service account in `.streamlit/secrets.toml`, or a prior
+`earthengine authenticate` session on your machine.
 
-## 🔐 Authentication
-
-AgriVision Pro requires Google Earth Engine access. Choose your setup path:
-
-| Method | Best For | Guide |
-|--------|----------|-------|
-| **Upload Credentials** | Streamlit Cloud users | [GEE Setup Guide](GEE_SETUP.md) |
-| **Local Authentication** | Local development | `earthengine authenticate` |
-| **Service Account** | Deployment/Production | See Deployment section |
-
-📖 **Complete setup instructions**: **[GEE_SETUP.md](GEE_SETUP.md)**
+> Setting up the backend (Earth Engine service account, visitor tracking,
+> weekly summary email) is an admin task, not something end users need to
+> do — see **[ADMIN_SETUP.md](ADMIN_SETUP.md)**.
 
 ---
 
@@ -97,31 +84,24 @@ AgriVision_Pro/
 │   ├── map_utils.py          # Map visualization
 │   └── download_utils.py     # Export functionality
 ├── app_components/           # UI components
-│   ├── auth_component.py     # GEE authentication
+│   ├── auth_component.py     # Earth Engine init (service account, no user login)
+│   ├── sheets_utils.py       # Persistent visitor count & contact form (Google Sheets)
+│   ├── contact_form.py       # Optional landing-page contact form
+│   ├── visitor_stats.py      # Visitor counter display
 │   ├── aoi_component.py      # Area of Interest selection
 │   └── time_series.py        # Time series charts
+├── scripts/
+│   └── send_weekly_summary.py  # Weekly email summary (run by GitHub Actions)
+├── .github/workflows/
+│   ├── keep-alive.yml        # Pings the app so it doesn't sleep
+│   └── weekly-summary.yml    # Sends the weekly summary email
 └── .streamlit/
     └── config.toml           # Streamlit configuration
 ```
 
----
-
-## ☁️ Deployment on Streamlit Cloud
-
-1. **Push to GitHub**
-
-2. **Connect to Streamlit Cloud**: [share.streamlit.io](https://share.streamlit.io)
-
-3. **Add secrets** (optional - for service account):
-   ```toml
-   [gee_service_account]
-   type = "service_account"
-   project_id = "your-project-id"
-   private_key_id = "..."
-   private_key = "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-   client_email = "...@....iam.gserviceaccount.com"
-   # ... rest of service account JSON
-   ```
+Admin/backend setup (Earth Engine service account, Google Sheet, weekly
+email) is documented in **[ADMIN_SETUP.md](ADMIN_SETUP.md)** — end users
+never see or need any of it.
 
 ---
 
@@ -148,7 +128,8 @@ MIT License - See [LICENSE](LICENSE) for details.
 ## 📞 Support
 
 - **Issues**: [GitHub Issues](https://github.com/aashish66/AgriVision_Pro_Version1/issues)
-- **GEE Help**: [GEE Setup Guide](GEE_SETUP.md)
+- **Admin/backend setup**: [ADMIN_SETUP.md](ADMIN_SETUP.md)
+- **GEE account signup**: [GEE Setup Guide](GEE_SETUP.md)
 
 ---
 

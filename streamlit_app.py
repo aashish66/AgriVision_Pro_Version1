@@ -34,10 +34,11 @@ from datetime import datetime, timedelta
 import json
 
 # Import app components
-from app_components.auth_component import AuthComponent, ensure_ee_initialized
+from app_components.auth_component import ensure_ee_initialized
 from app_components.aoi_component import AOIComponent
 from app_components.time_series import TimeSeriesComponent
 from app_components.visitor_stats import VisitorStatsComponent
+from app_components.contact_form import ContactFormComponent
 from app_components.theme_utils import apply_theme_css
 
 # Import core modules
@@ -51,7 +52,7 @@ from core.vegetation_indices import (
     calculate_index, get_available_indices, get_index_vis_params
 )
 from core.map_utils import display_ee_map
-from core.download_utils import get_download_url, create_download_button
+from core.download_utils import download_ee_image_bytes
 
 # Apply theme CSS
 apply_theme_css()
@@ -63,8 +64,6 @@ apply_theme_css()
 
 if 'app_mode' not in st.session_state:
     st.session_state.app_mode = None  # None = landing, 'satellite', 'compare', 'help'
-if 'gee_authenticated' not in st.session_state:
-    st.session_state.gee_authenticated = False
 
 
 # =============================================================================
@@ -179,35 +178,15 @@ def render_landing_page():
         if st.button("❓ Open Help", type="primary", use_container_width=True, key="btn_help"):
             st.session_state.app_mode = 'help'
             st.rerun()
-    
+
+    # Optional contact form
+    st.markdown("---")
+    contact_form = ContactFormComponent()
+    contact_form.render()
+
     # Visitor stats footer
     visitor_stats = VisitorStatsComponent()
     visitor_stats.render_footer()
-
-
-# =============================================================================
-# Authentication Page
-# =============================================================================
-
-def render_auth_page():
-    """Render authentication page."""
-    st.markdown("""
-    <div class="landing-hero">
-        <div style="font-size: 3rem; margin-bottom: 1rem;">🔐</div>
-        <h1 class="landing-title">Authentication Required</h1>
-        <p class="landing-subtitle">
-            Connect to Google Earth Engine to access satellite data
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    auth_component = AuthComponent()
-    if auth_component.render():
-        st.success("🎉 Authentication successful!")
-        st.info("🔄 Loading platform...")
-        import time
-        time.sleep(1)
-        st.rerun()
 
 
 # =============================================================================
@@ -224,11 +203,10 @@ def render_satellite_analysis():
     
     st.title("🛰️ Satellite Analysis")
     st.markdown("Analyze vegetation indices from satellite imagery")
-    
-    # Check authentication
+
+    # Check Earth Engine connectivity (auto-connects via service account, no user login)
     if not ensure_ee_initialized():
-        st.warning("⚠️ Please authenticate with Google Earth Engine")
-        render_auth_page()
+        st.error("🛰️ Satellite data is temporarily unavailable. Please try again shortly.")
         return
     
     # Step 1: AOI Selection
@@ -416,10 +394,26 @@ def _generate_vegetation_map(aoi, sensor, index_name, start_date, end_date,
             
             # Download option
             with st.expander("📥 Download Options"):
-                if st.button("Generate Download URL", key="sat_download"):
-                    url = get_download_url(index_image, aoi, scale, f"{index_name}_map")
-                    if url:
-                        st.markdown(f"[📥 Download GeoTIFF]({url})")
+                if st.button("Prepare Download", key="sat_download"):
+                    with st.spinner("Preparing GeoTIFF..."):
+                        data, used_scale = download_ee_image_bytes(
+                            index_image, aoi, scale, f"{index_name}_map"
+                        )
+                    if data:
+                        if used_scale != scale:
+                            st.info(
+                                f"ℹ️ Resolution automatically adjusted to {used_scale}m "
+                                f"to fit the download size limit."
+                            )
+                        st.download_button(
+                            "📥 Download GeoTIFF",
+                            data=data,
+                            file_name=f"{index_name}_map.tif",
+                            mime="image/tiff",
+                            key="sat_download_btn"
+                        )
+                    else:
+                        st.error("❌ Download failed. Try a smaller area or coarser resolution.")
             
         except Exception as e:
             st.error(f"❌ Error: {str(e)}")
@@ -439,11 +433,10 @@ def render_compare_images():
     
     st.title("🔄 Compare Images")
     st.markdown("Compare vegetation changes between two dates or sensors")
-    
-    # Check authentication
+
+    # Check Earth Engine connectivity (auto-connects via service account, no user login)
     if not ensure_ee_initialized():
-        st.warning("⚠️ Please authenticate with Google Earth Engine")
-        render_auth_page()
+        st.error("🛰️ Satellite data is temporarily unavailable. Please try again shortly.")
         return
     
     # Step 1: AOI Selection
@@ -928,18 +921,6 @@ def render_help_page():
     - Upload multi-band TIFF with NIR band
     - Specify band mapping (R, G, B, NIR positions)
     - Calculate NDVI, EVI, SAVI, etc.
-    
-    ---
-    
-    ## 🔐 Authentication
-    
-    To use AgriVision Pro satellite features:
-    
-    1. **Get credentials**: Run `earthengine authenticate` in terminal
-    2. **Find credentials**: `~/.config/earthengine/credentials`
-    3. **Upload**: Upload the credentials file when prompted
-    
-    *Note: Drone Image Analysis does NOT require authentication*
     """)
 
 
@@ -949,27 +930,13 @@ def render_help_page():
 
 def main():
     """Main application entry point."""
-    
-    # Check authentication first
-    if not st.session_state.get('gee_authenticated', False):
-        # Try auto-auth from secrets
-        try:
-            if hasattr(st, 'secrets') and 'gee_service_account' in st.secrets:
-                if ensure_ee_initialized():
-                    st.session_state.gee_authenticated = True
-        except Exception:
-            pass
-    
+
     # Route to appropriate page
     app_mode = st.session_state.get('app_mode')
-    
+
     if app_mode is None:
-        # Check if authenticated, show auth page if not
-        if not st.session_state.get('gee_authenticated', False):
-            render_auth_page()
-        else:
-            render_landing_page()
-    
+        render_landing_page()
+
     elif app_mode == 'satellite':
         render_satellite_analysis()
     

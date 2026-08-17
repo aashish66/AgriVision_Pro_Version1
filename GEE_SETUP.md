@@ -106,21 +106,16 @@ Your credentials are automatically saved at:
 
 ## 🌐 Using AgriVision Pro on Streamlit Cloud
 
-When using the live app at [https://agrivision-pro.streamlit.app/](https://agrivision-pro.streamlit.app/):
+The live app at [https://agrivision-pro.streamlit.app/](https://agrivision-pro.streamlit.app/)
+needs none of this from you — it connects to Earth Engine automatically
+using a pre-configured service account. There is no credentials upload or
+login step for end users.
 
-### Option A: Upload Credentials File (Recommended)
-1. Click **"Upload Credentials File"** in the authentication sidebar
-2. Navigate to your credentials file location (Step 4 above)
-3. Select the `credentials` file
-4. Enter your GEE Project ID
-5. Click **"Initialize GEE"**
-
-### Option B: Manual Entry
-1. Open your credentials file in a text editor
-2. Copy the entire contents (it's JSON format)
-3. Paste into the credentials text area in the app
-4. Enter your GEE Project ID
-5. Click **"Initialize GEE"**
+If you're the one *running* the deployment and need to configure that
+service account (or the visitor tracking / weekly email backend), see
+**[ADMIN_SETUP.md](ADMIN_SETUP.md)** instead — the steps above (signup,
+`earthengine authenticate`) are what feed into creating that service
+account in the first place.
 
 ---
 

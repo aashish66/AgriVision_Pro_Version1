@@ -1,0 +1,29 @@
+name: Weekly Summary Email
+
+on:
+  schedule:
+    # Every Monday at 13:00 UTC
+    - cron: "0 13 * * 1"
+  workflow_dispatch: {}
+
+jobs:
+  send-summary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install gspread google-auth
+
+      - name: Send weekly summary
+        env:
+          GEE_SERVICE_ACCOUNT_JSON: ${{ secrets.GEE_SERVICE_ACCOUNT_JSON }}
+          SHEET_ID: ${{ secrets.SHEET_ID }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+        run: python scripts/send_weekly_summary.py
